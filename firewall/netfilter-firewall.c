@@ -25,6 +25,7 @@ static unsigned char *blocked_ip = "\xD0\x50\x9A\xE0"; // IP we're blocking traf
 static char *blocked_interface = "lo"; // interface we're blocking traffic on
 struct sk_buff *sock_buff; // struct to copy packet over to
 struct udphdr *udp_header; // struct to copy udp header over to
+struct iphdr *ip_header;   // struct to copy ip header over to
 
 /* ===============================================================================================
  * module functions
@@ -36,23 +37,26 @@ unsigned int hook_func(
     ) 
 {
     // block traffic recieved on "blocked_interface"
-    if(strcmp(state->in, blocked_interface) == 0) {
+    if(strcmp((char*)state->in, blocked_interface) == 0) {
     printk(KERN_INFO "Dropping packet recieved on interface: %s\n", state->in); 
 
     return NF_DROP;
     }
 
-    sock_buff = *skb;
+    // copy packet and grab network header
+    sock_buff = skb;
+    ip_header = (struct iphdr*)skb_network_header(sock_buff);
     
     // check for valid sk_buff and validate IP packet
-    if(!sock_buff || !(sock_buff->nh.iph)) { return NF_ACCEPT; }    
+    //if(!sock_buff || !(sock_buff->nh.iph)) { return NF_ACCEPT; }    
 
     // compare source address with block IP
-    if(sock_buff->nh.iph->saddr == *(unsigned int*)ip_address) {
-        printk(KERN_INFO "Dropping packet with source address: %s\n", *(unsigned int*)blocked_ip);    
+    //if(sock_buff->nh.iph->saddr == *(unsigned int*)blocked_ip) {
+    //    printk(KERN_INFO "Dropping packet with source address: %s\n", *(unsigned int*)blocked_ip);    
             
-        return NF_DROP; 
-    }
+    //    return NF_DROP; 
+    return NF_ACCEPT;
+    //}
 }
 
 static struct nf_hook_ops nfho = { // struct holding set of hook function options
