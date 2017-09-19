@@ -1,0 +1,1 @@
+cmd_/home/mark/CLionProjects/LKMnetfilter/simple/netfilter-simple.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/mark/CLionProjects/LKMnetfilter/simple/netfilter-simple.ko /home/mark/CLionProjects/LKMnetfilter/simple/netfilter-simple.o /home/mark/CLionProjects/LKMnetfilter/simple/netfilter-simple.mod.o ;  true
