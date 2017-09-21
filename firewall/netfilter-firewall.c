@@ -1,7 +1,7 @@
 /*************************************************************************************************
  * Another Simple netfilter example -- drops all traffic on "lo" interface, drop all traffic coming
- * from 208.80.154.224 (wikipedia, drops all ping requests/responses, and finally modifies all dns
- * resolutions to point to 172.217.10.110 (google)
+ * from the 208.80.154.0/24 (wikipedia, drops all ping requests/responses, and finally modifies all dns
+ * resolutions for google to point to yahoo
  ************************************************************************************************/
 
 // standard includes
@@ -21,7 +21,8 @@
 /* ===============================================================================================
  * globals
  * * ===============================================================================================*/
-static char *blocked_ip = "208.80.154.240"; // IP we're blocking traffic 
+static int blocked_ip[4] = {208, 80, 154, 240}; // Using the 1st 3 octets to block /24 subnet
+static unsigned int blocked_subnet; // int representation of calculated /24 subnet
 static char *blocked_interface = "lo"; // interface we're blocking traffic on
 struct sk_buff *sock_buff; // struct to copy packet over to
 struct udphdr *udp_header; // struct to copy udp header over to
@@ -33,6 +34,25 @@ char source_addr[16], dest_addr[16];
 /* ===============================================================================================
  * module functions
  * ===============================================================================================*/
+
+/* Function for getting int representation of subnet we're blocking
+ *@param blocked_ip: int array consisting of ip used to claculate int subnet
+ *@param size: size of blocked_ip int array
+ * */
+unsigned int calc_subnet(int ip[], int size) {
+    // convert ip address to int representing it's /24 subnet
+    unsigned int subnet = ip[0];
+    int i;
+
+    for(i=1;i<(size - 1);i++) { // don't include last octet
+        subnet = (subnet << 8) ^ ip[i];
+        printk(KERN_INFO "%u\n", subnet);
+    }
+    subnet = subnet << 8; // shift left for last zeroed-out octet
+
+    return subnet;
+}
+
 unsigned int hook_func(
     void *priv,
     struct sk_buff *skb,
@@ -68,10 +88,16 @@ unsigned int hook_func(
         printk(KERN_INFO "TCP route: %s:%d -> %s:%d\n", source_addr, sport, dest_addr, dport);
         printk(KERN_INFO "SKBuffer: len %d, data_len %d\n", sock_buff->len, sock_buff->data_len);
         
-        // now drop any packets recived from 208.80.154.224 (wikipedia)
-        if(strcmp(source_addr, blocked_ip) == 0) {
+        // now drop any packets recived from 208.80.154.0/24 (wikipedia)        
+        unsigned int saddr = htonl((ip_header->saddr)); // convert host byte order to network byte order
+       saddr = saddr >> 8 << 8; // zero out last octet
+
+        if(saddr == blocked_subnet) {
             printk(KERN_INFO "Dropping packet recieved from Wikipedia\n");
             
+            //printk(KERN_INFO ">>>source subnet>>> %u\n", saddr);
+            //printk(KERN_INFO ">>>blocked subnet>>> %u\n", blocked_subnet);
+
             return NF_DROP;
         }
         
@@ -100,7 +126,11 @@ static struct nf_hook_ops nfho = { // struct holding set of hook function option
  * entry function
  * ================================================================================================*/
 static int __init onload(void) {
-    nf_register_hook(&nfho);          //register hook
+    // get int representation of subnet we're blocking
+    blocked_subnet = calc_subnet(blocked_ip, sizeof(blocked_ip)/sizeof(blocked_ip[0]));
+
+    // register hook
+    nf_register_hook(&nfho);
 
     printk(KERN_EMERG "Loadable module initialized\n"); 
 
