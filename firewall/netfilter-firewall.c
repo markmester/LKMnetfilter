@@ -1,7 +1,6 @@
 /*************************************************************************************************
- * Another Simple netfilter example -- drops all traffic on "lo" interface, drop all traffic coming
- * from the 208.80.154.0/24 (wikipedia, drops all ping requests/responses, and finally modifies all dns
- * resolutions for google to point to yahoo
+ * Simple netfilter example for mangling IP traffic -- drops all traffic on "lo" interface, all traffic coming
+ * from the 208.80.154.0/24 (wikipedia), all ping requests/responses, and all dns traffic.
  ************************************************************************************************/
 #define DEBUG
 #define UDP_HDR_LEN 8
@@ -110,12 +109,14 @@ unsigned int hook_func(
     ) 
 {
     
+    
     /* Drop packets recieved on lo interface
     if(strcmp((char*)state->in, blocked_interface) == 0) {
         printk(KERN_INFO ">>> Dropping packet recieved on interface: %s\n", (char *)state->in); 
 
          return NF_DROP;
-    }*/
+    }
+    */
 
     /* copy packet and grab network header */
     sock_buff = skb;
@@ -141,8 +142,7 @@ unsigned int hook_func(
             print_route(sport, dport, source_addr, dest_addr, "TCP");
 
             /* now drop any packets recived from 208.80.154.0/24 (wikipedia)        
-             * first convert host byte order to network byte order and zero out last octet
-             */
+             * first convert host byte order to network byte order and zero out last octet */
             saddr = htonl((ip_header->saddr)) >> 8 << 8;
 
             if(saddr == blocked_subnet) {
@@ -151,7 +151,7 @@ unsigned int hook_func(
                 return NF_DROP;
             }
 
-            /* TESTING */
+            /* Print out http payload for fun :-) */
             recv_tcpdata(sock_buff);
         
         return NF_ACCEPT; 
@@ -166,7 +166,7 @@ unsigned int hook_func(
                 printk(KERN_INFO ">>> Discovered DNS packet...\n");
             }
 
-            return NF_ACCEPT;
+            return NF_DROP;
         
         case IPPROTO_ICMP: // ICMP packet handling
             printk(KERN_INFO "Dropping packet with ICMP protocol\n");
